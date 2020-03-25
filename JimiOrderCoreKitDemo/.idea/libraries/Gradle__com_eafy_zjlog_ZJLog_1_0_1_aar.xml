@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: com.eafy.zjlog:ZJLog:1.0.1@aar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/e0565dc1cf5358afa9835463331da0af/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/e0565dc1cf5358afa9835463331da0af/res" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.eafy.zjlog/ZJLog/1.0.1/117464b49c0edb6e8411d3336e7a7236513cafa7/ZJLog-1.0.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
