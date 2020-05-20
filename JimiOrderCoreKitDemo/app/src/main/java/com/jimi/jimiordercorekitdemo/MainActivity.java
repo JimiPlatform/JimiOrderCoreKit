@@ -3,7 +3,6 @@ package com.jimi.jimiordercorekitdemo;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
@@ -21,18 +20,14 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.jimi.jimiordercorekit.JMOrderCoreKit;
-import com.jimi.jimiordercorekit.JMOrderPusherCmdListener;
 import com.jimi.jimiordercorekit.JMOrderPusherListener;
 import com.jimi.jimiordercorekit.JMOrderServerListener;
 import com.jimi.jimiordercorekit.JMOrderTrackerListener;
 import com.jimi.jimiordercorekit.Model.JMTrackAlertInfo;
-import com.jimi.jimiordercorekit.Model.JMTrackAlertTypeEnum;
 import com.jimi.jimiordercorekit.Model.JMTrackReplyControlCmdInfo;
-import com.jimi.jimiordercorekit.Model.JMTrackGPSReportModeEnum;
-import com.jimi.jimiordercorekit.Model.JMTrackGSMSignalEnum;
 import com.jimi.jimiordercorekit.Model.JMTrackHeartbeatInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackPositionInfo;
-import com.jimi.jimiordercorekit.Model.JMTrackUploadFileResultInfo;
+import com.jimi.jimiordercorekit.Utils.JMSDKModeEnum;
 import com.jimi.jmlog.JMLog;
 
 import org.json.JSONArray;
@@ -43,6 +38,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.TimeZone;
+
+import static com.jimi.jimiordercorekit.Model.JMTrackAlertInfo.JMAlertType_RearviewCameraShake;
+import static com.jimi.jimiordercorekit.Model.JMTrackHeartbeatInfo.JMGSMSignal_Stronger;
+import static com.jimi.jimiordercorekit.Model.JMTrackPositionInfo.JMPositionMode_Timing;
 
 public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
@@ -61,9 +60,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
     private boolean bIsPlayback1 = false;
     private boolean bIsPlayback2 = false;
 
-    private SharedPreferences mSettingPreferences;
-    private SharedPreferences.Editor mDataEditor;    //用来保存模拟设置的数据
-
     /*以下是音视频编码器的相关参数，具体数据需要根据开发者的项目决定*/
     private int mVideoWidth = 640;          //视频编码宽度
     private int mVideoHeight = 480;         //视频编码高度
@@ -73,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
     private int mAudioChannels = 1;         //音频编码通道数
     private int mAudioBitRate = 128000;     //音频编码比特率
 
-    private String mIMEI = "357730091014168"; //"353376110005078"，"357730091014168";
+    private String mIMEI = "357730091014168"; //"357730091014168";
     private boolean bSupportMulCamera = true;  //是否支持多路摄像头同时播放
     private boolean bFrontCamera = false;   //是否是切换前摄像头（单路有效）
     private boolean bStopPlay = true;
@@ -93,11 +89,9 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         if (!bHasPermission) {
             requestPermission();
         }
-        initPrefernces();
 
         JMLog.setTAG("JMTrack");
-        JMLog.setFileName("JMOrderCoreKit_" + mIMEI);
-        JMLog.setSavePathDic(Environment.getExternalStorageDirectory().getAbsolutePath() + "/JMOrderCoreKitLog" + File.separator);
+        JMLog.setFileName(mIMEI);
         JMLog.setSaveEnable(true);   //日志保存到内置存储卡
 
         JMOrderCoreKit.initialize(getApplication());
@@ -116,7 +110,9 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         mJMOrderCoreKit.setTrackerDelegate(mJMOrderTrackerListener);
         mJMOrderCoreKit.setPusherDelegate(mJMOrderPusherListener);
 
-//        mJMOrderCoreKit.setPusherCmdDelegate(mJMOrderPusherCmdListener);    //监听实时视频指令和回复单独使用此监听，和setPusherDelegate对立
+        //DVR和Tracker分离需要调用下面的配置
+//        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.Pusher);        //仅DVR实时视频模式
+//        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.Tracker);     //仅Tracker模式
 
         mJMOrderCoreKit.connect();
     }
@@ -138,6 +134,23 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         mJMOrderCoreKit.release();
         mJMOrderCoreKit = null;
         JMOrderCoreKit.deInitialize();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        final Handler mHandler = new Handler();
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (mJMOrderCoreKit.getSDKMode() != JMSDKModeEnum.Tracker) {    //模拟开始摄像头
+                    startBackCamera();
+                    startFrontCamera();
+                    startAACEncoder();
+                }
+            }
+        };
+        mHandler.postDelayed(r, 100);
     }
 
     @Override
@@ -196,7 +209,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public void onServerConnectStatus(int state) {
-            if (state == 2) {
+            if (state == 2 && (mJMOrderCoreKit.getSDKMode() != JMSDKModeEnum.Tracker)) {  //已连接，且是包含Pusher模式才启动
                 Handler mainHandler = new Handler(Looper.getMainLooper());
                 mainHandler.post(new Runnable() {
                     @Override
@@ -209,29 +222,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                 startFrontCamera();
                 startAACEncoder();
             }
-        }
-    };
-
-    private JMOrderPusherCmdListener mJMOrderPusherCmdListener = new JMOrderPusherCmdListener() {
-
-
-        @Override
-        public void onPusherLiveRecvCmdData(int serverFlagId, String recvCmdDataStr) {
-            mJMOrderCoreKit.sendLiveCmdToSDK(serverFlagId, recvCmdDataStr);
-
-            //广播或其他方式将内容发给实时视频模块
-
-            //模拟：实时视频模块收到内容，并发给SDK（实现中下面代码不需要）
-            mJMOrderCoreKit.sendLiveCmdToSDK(serverFlagId, recvCmdDataStr);
-        }
-
-        @Override
-        public void onPusherLiveRelayCmdData(int serverFlagId, String relayCmdDataStr) {
-
-            //广播或其他方式将内容发给Tracker模块，再发送给服务器
-
-            //模拟：Tracker模块收到内容，并发给服务器（实现中下面代码不需要）
-            mJMOrderCoreKit.relayMsgToServer(serverFlagId, relayCmdDataStr);
         }
     };
 
@@ -335,7 +325,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             info.accEnable = true;
             info.protectEnable = false;
             info.voltage = 100;
-            info.signalStrength = JMTrackGSMSignalEnum.BETTER;
+            info.signalStrength = JMGSMSignal_Stronger;
         }
 
         @Override
@@ -343,185 +333,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             JMLog.d("onTrackerReplyControl cmdContent:" + cmdContent);      //正式版中类似Log的代码可以删掉
 
             //处理SDK内部未收录的指令，需要自行解析，之后在info.replyContent中填入相应需要回复的内容
-        }
-
-        @Override
-        public void onTrackerReplyPictureTake(JMTrackUploadFileResultInfo info, int cameraId) {
-            JMLog.d("onTrackerReplyPictureTake cameraId:" + cameraId + " serverFlag:" + info.getServerFlagId());
-
-            //发送应答
-            info.send();
-
-            //对摄像头拍照上传至七牛云或几米云或其他第三个云存储平台
-
-
-            // 情况1：
-            // 可以上传，即空闲状态，直接调用 info.send();
-            // 情况2：
-            // 正在上传或处理其他Camera操作，无法拍照或上传，调用info.sendBusy();
-        }
-
-        @Override
-        public void onTrackerReplyVideoRecord(JMTrackUploadFileResultInfo info, int cameraId) {
-            JMLog.d("onTrackerReplyVideoRecord cameraId:" + cameraId + " serverFlag:" + info.getServerFlagId());
-
-            //发送应答
-            info.send();
-
-            //对摄像头录像上传至七牛云或几米云或其他第三个云存储平台
-
-
-            // 情况1：
-            // 可以上传，即空闲状态，直接调用 info.send();
-            // 情况2：
-            // 正在上传或处理其他Camera操作，无法录像或上传，调用info.sendBusy();
-        }
-
-        @Override
-        public void onTrackerReplyWiFiEnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyWiFiEnable bOpen:" + bOpen);
-            //处理相关设置或操作
             info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyDVREnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyDVREnable bOpen:" + bOpen);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyVideoFileList(int serverFlagId) {
-            JMLog.d("onTrackerReplyVideoFileList");
-            //处理文件相关设置或操作
-        }
-
-        @Override
-        public void onTrackerReplySupportReplay(JMTrackReplyControlCmdInfo info) {
-            JMLog.d("onTrackerReplySupportReplay");
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyWiFiAPEnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyWiFiAPEnable bOpen:" + bOpen);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyVolumeSetting(JMTrackReplyControlCmdInfo info, int volume) {
-            JMLog.d("onTrackerReplyVolumeSetting volume:" + volume);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyLedEnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyLedEnable bOpen:" + bOpen);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyDefenseEnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyDefenseEnable bOpen:" + bOpen);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyDefenseTime(JMTrackReplyControlCmdInfo info, int duration) {
-            JMLog.d("onTrackerReplyDefenseTime duration:" + duration);
-            //处理相关设置或操作
-            mDataEditor.putInt("kDefenseTime", duration);
-            mDataEditor.commit();
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyDefenseTimeQuery(JMTrackReplyControlCmdInfo info) {
-            JMLog.d("onTrackerReplyDefenseTimeQuery");
-            //获取本地设置的时间，然后返回
-            int time = mSettingPreferences.getInt("kDefenseTime", 3);
-            info.send(String.valueOf(time));
-        }
-
-        @Override
-        public void onTrackerReplySpeedSetting(JMTrackReplyControlCmdInfo info, boolean bOpen, int duration, int speed) {
-            JMLog.d("onTrackerReplySpeedSetting bOpen:" + bOpen + " duration:" + duration + " speed:" + speed);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyRapidAccSetting(JMTrackReplyControlCmdInfo info, boolean bOpen, boolean bUpload, int sensitivity) {
-            JMLog.d("onTrackerReplyRapidAccSetting bOpen:" + bOpen + " bUpload:" + bUpload + " sensitivity:" + sensitivity);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyRapidDecSetting(JMTrackReplyControlCmdInfo info, boolean bOpen, boolean bUpload, int sensitivity) {
-            JMLog.d("onTrackerReplyRapidDecSetting bOpen:" + bOpen + " bUpload:" + bUpload + " sensitivity:" + sensitivity);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyRapidTurnSetting(JMTrackReplyControlCmdInfo info, boolean bOpen, boolean bUpload, int sensitivity) {
-            JMLog.d("onTrackerReplyRapidTurnSetting bOpen:" + bOpen + " bUpload:" + bUpload + " sensitivity:" + sensitivity);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplySenalmSetting(JMTrackReplyControlCmdInfo info, boolean bOpen, boolean bUpload, int sensitivity, int videoTime) {
-            JMLog.d("onTrackerReplySenalmSetting bOpen:" + bOpen + " bUpload:" + bUpload + " sensitivity" + sensitivity + " videoTime:" + videoTime);
-            //处理相关设置或操作
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplySosSetting(JMTrackReplyControlCmdInfo info, boolean bAdd, String sosListStr) {
-            JMLog.d("onTrackerReplySosSetting bAdd:" + bAdd + " sosListStr:" + sosListStr);
-            JSONArray sosJson = null;
-            try {
-                sosJson = new JSONArray(sosListStr);
-                //获取3个号码进行其他操作
-                mDataEditor.putString("kSosList", sosJson.toString());
-                mDataEditor.commit();
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplySosQuery(JMTrackReplyControlCmdInfo info) {
-            JMLog.d("onTrackerReplySosQuery");
-
-            //模拟SOS已设置的号码
-            String sosListStr = mSettingPreferences.getString("kSosList", "[\"\",\"\",\"\"]");
-            info.send(sosListStr);
-        }
-
-        @Override
-        public void onTrackerReplyRelayEnable(JMTrackReplyControlCmdInfo info, boolean bOpen) {
-            JMLog.d("onTrackerReplyRelayEnable bOpen:" + bOpen);
-            //处理Relay的设置
-            mDataEditor.putBoolean("kRelayEnable", bOpen);
-            mDataEditor.commit();
-            info.sendOK();
-        }
-
-        @Override
-        public void onTrackerReplyRelayQuery(JMTrackReplyControlCmdInfo info) {
-            JMLog.d("onTrackerReplyRelayQuery");
-            boolean relayState = mSettingPreferences.getBoolean("kRelayEnable", false);
-            info.send(String.valueOf(relayState));
         }
     };
 
@@ -716,7 +528,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     info.longitude = location.getLongitude();
                     info.gpsEnable = true;
                     info.direction = 0;
-                    info.alertType = JMTrackAlertTypeEnum.REARVIEW_CAMERA_SHAKE;
+                    info.alertType = JMAlertType_RearviewCameraShake;
                     info.alertContent = "Hello DVR";    //实际的报警内容，这里是模拟的
 
                     info.send();    //报警上报
@@ -739,7 +551,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             positionInfo.time = getUTCTime();
             positionInfo.latitude = location.getLatitude();
             positionInfo.longitude = location.getLongitude();
-            positionInfo.reportMode = JMTrackGPSReportModeEnum.TIMING;
+            positionInfo.reportMode = JMPositionMode_Timing;
             positionInfo.gpsEnable = true;
 
             /*下面是模拟数据，实际设备按正确数值填写*/
@@ -764,10 +576,5 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         long time = cal.getTimeInMillis() / 1000;
 
         return time;
-    }
-
-    private void initPrefernces() {
-        mSettingPreferences = getSharedPreferences("JimiSimulateData", Context.MODE_PRIVATE);
-        mDataEditor = mSettingPreferences.edit();
     }
 }
