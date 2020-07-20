@@ -24,6 +24,7 @@ import com.jimi.jimiordercorekit.JMOrderPusherListener;
 import com.jimi.jimiordercorekit.JMOrderServerListener;
 import com.jimi.jimiordercorekit.JMOrderTrackerListener;
 import com.jimi.jimiordercorekit.Model.JMTrackAlertInfo;
+import com.jimi.jimiordercorekit.Model.JMTrackGeneralInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackReplyControlCmdInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackHeartbeatInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackPositionInfo;
@@ -69,7 +70,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
     private int mAudioChannels = 1;         //音频编码通道数
     private int mAudioBitRate = 128000;     //音频编码比特率
 
-    private String mIMEI = "357730091014168"; //"357730091014168";
+    private String mIMEI = "357730091014168"; //"357730091014168";353376110005078
     private boolean bSupportMulCamera = true;  //是否支持多路摄像头同时播放
     private boolean bFrontCamera = false;   //是否是切换前摄像头（单路有效）
     private boolean bStopPlay = true;
@@ -90,20 +91,19 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             requestPermission();
         }
 
-        JMLog.setTAG("JMTrack");
-        JMLog.setFileName(mIMEI);
-        JMLog.setSaveEnable(true);   //日志保存到内置存储卡
+        JMLog.config.setSaveEnable(true);   //日志保存到内置存储卡
 
         JMOrderCoreKit.initialize(getApplication());
         JMOrderCoreKit.configMediaPara(0, mVideoWidth, mVideoHeight, mVideoFrameRate, mVideoBitRate,
                 mAudioSampleRate, mAudioChannels, mAudioBitRate);
         JMOrderCoreKit.configMediaPara(1, mVideoWidth, mVideoHeight, mVideoFrameRate, mVideoBitRate,
                 mAudioSampleRate, mAudioChannels, mAudioBitRate);
-        if (!bSupportMulCamera) {
-            JMOrderCoreKit.closeMulCamera();
+        if (!bSupportMulCamera) {   //如果设备不支持多路同时播放
+            JMOrderCoreKit.closeMulCamera();        //关闭多路功能，仅支持单路播放
         }
         JMOrderCoreKit.configGatewayServer("36.133.0.208", 31100);      //配置网关调试服务器（正式版不需要）
         JMOrderCoreKit.configLiveServer("", "36.133.0.208");        //配置RTMP调试服务器（正式版不需要）
+        JMOrderCoreKit.closeSSL();  //关闭视频加密
 
         mJMOrderCoreKit = new JMOrderCoreKit(getApplicationContext(), mIMEI);
         mJMOrderCoreKit.setServerDelegate(mJMOrderServerListener);
@@ -147,10 +147,13 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     startBackCamera();
                     startFrontCamera();
                     startAACEncoder();
+
+//                    mJMOrderCoreKit.initPusher("rtmp://live.jimivideo.com/live/test?secret=admin_xzl_180236");
+//                    mJMOrderCoreKit.initPusher("rtmp://10.0.17.141:1935/lzj/room");
                 }
             }
         };
-        mHandler.postDelayed(r, 100);
+        mHandler.postDelayed(r, 500);
     }
 
     @Override
@@ -161,12 +164,16 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             Camera.Size size = camera.getParameters().getPreviewSize();
             byte[] tmpBuf = new byte[size.width * size.height * 3 / 2];
             System.arraycopy(bytes, 0, tmpBuf, 0, tmpBuf.length);
-            avcEncoder1.encodeNV21Data(tmpBuf);
+            if (avcEncoder1 != null) {
+                avcEncoder1.encodeNV21Data(tmpBuf);
+            }
         } else if (camera == mCamera2 && (bSupportMulCamera || (!bSupportMulCamera && bFrontCamera))) {
             Camera.Size size = camera.getParameters().getPreviewSize();
             byte[] tmpBuf = new byte[size.width * size.height * 3 / 2];
             System.arraycopy(bytes, 0, tmpBuf, 0, tmpBuf.length);
-            avcEncoder2.encodeNV21Data(tmpBuf);
+            if (avcEncoder2 != null) {
+                avcEncoder2.encodeNV21Data(tmpBuf);
+            }
         }
     }
 
@@ -175,11 +182,11 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         @Override
         public void pushAudioData(byte[] data, long timestamp) {
             if (mJMOrderCoreKit != null && !bIsPlayback1) {
-                mJMOrderCoreKit.pushAudioData(0, data, timestamp);
+                mJMOrderCoreKit.pushAudioData(0, data);
             }
 
             if (mJMOrderCoreKit != null && !bIsPlayback2) {
-                mJMOrderCoreKit.pushAudioData(1, data, timestamp);
+                mJMOrderCoreKit.pushAudioData(1, data);
             }
         }
     };
@@ -190,11 +197,11 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         public void pushVideoData(AVCEncoder avcEncoder, byte[] data, long timestamp, boolean isKey) {
             if (mJMOrderCoreKit != null) {
                 if (!bSupportMulCamera && !bIsPlayback1) {   //单路
-                    mJMOrderCoreKit.pushVideoData(0, data, timestamp, isKey);
+                    mJMOrderCoreKit.pushVideoData(0, data, isKey);
                 } else if (avcEncoder == avcEncoder1 && !bIsPlayback1) {
-                    mJMOrderCoreKit.pushVideoData(0, data, timestamp, isKey);
+                    mJMOrderCoreKit.pushVideoData(0, data, isKey);
                 } else if (avcEncoder == avcEncoder2 && !bIsPlayback2) {
-                    mJMOrderCoreKit.pushVideoData(1, data, timestamp, isKey);
+                    mJMOrderCoreKit.pushVideoData(1, data, isKey);
                 }
             }
         }
@@ -219,7 +226,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                 });
 
                 startBackCamera();
-                startFrontCamera();
+//                startFrontCamera();
                 startAACEncoder();
             }
         }
@@ -245,6 +252,45 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             } else {
                 bStopPlay = true;
             }
+        }
+
+        @Override
+        public ArrayList<String> onPusherQueryPlaybackList(int channel, String appId, long startTime, long endTime) {
+
+            //模拟数据，正式项目应该按照channel、startTime、endTime查询真实的视频文件列表名称
+            ArrayList<String> list = new ArrayList<>();
+            list.add("2020_06_10_00_00_01_01.mp4");
+            list.add("2020_06_10_00_01_01_01.mp4");
+            list.add("2020_06_10_00_02_01_01.mp4");
+            list.add("2020_06_10_00_03_01_01.mp4");
+            list.add("2020_06_10_00_04_01_01.mp4");
+            list.add("2020_06_10_00_05_01_01.mp4");
+            list.add("2020_06_10_00_06_01_01.mp4");
+            list.add("2020_06_10_00_07_01_01.mp4");
+            list.add("2020_06_10_00_08_01_01.mp4");
+            list.add("2020_06_10_00_09_01_01.mp4");
+            list.add("2020_06_10_00_10_01_01.mp4");
+            list.add("2020_06_10_00_11_01_01.mp4");
+            list.add("2020_06_10_00_12_01_01.mp4");
+            list.add("2020_06_10_00_13_01_01.mp4");
+            list.add("2020_06_10_00_14_01_01.mp4");
+            list.add("2020_06_10_00_15_01_01.mp4");
+            list.add("2020_06_10_00_16_01_01.mp4");
+            list.add("2020_06_10_00_17_01_01.mp4");
+            list.add("2020_06_10_00_18_01_01.mp4");
+            list.add("2020_06_10_00_19_01_01.mp4");
+            list.add("2020_06_10_00_20_01_01.mp4");
+            list.add("2020_06_10_00_21_01_01.mp4");
+            list.add("2020_06_10_00_22_01_01.mp4");
+            list.add("2020_06_10_00_23_01_01.mp4");
+            list.add("2020_06_10_00_24_01_01.mp4");
+            list.add("2020_06_10_00_25_01_01.mp4");
+            list.add("2020_06_10_00_26_01_01.mp4");
+            list.add("2020_06_10_00_27_01_01.mp4");
+            list.add("2020_06_10_00_28_01_01.mp4");
+            list.add("2020_06_10_00_29_01_01.mp4");
+
+            return list;
         }
 
         @Override
@@ -361,7 +407,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                         "Camera AND storage permission are required for this demo", Toast.LENGTH_LONG).show();
             }
             requestPermissions(new String[]{Manifest.permission.CAMERA,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE,
                             Manifest.permission.RECORD_AUDIO,
                             Manifest.permission.READ_PHONE_STATE,
                             Manifest.permission.ACCESS_FINE_LOCATION},
@@ -511,8 +557,9 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
     private int positionCount = 0;
     private JMTrackPositionInfo positionInfo = new JMTrackPositionInfo();
+
     private void startPosition() {
-        GPSUtils.getInstance(getApplicationContext()).getLngAndLat(new GPSUtils.OnLocationResultListener(){
+        GPSUtils.getInstance(getApplicationContext()).getLngAndLat(new GPSUtils.OnLocationResultListener() {
 
             @Override
             public void onLocationResult(Location location) {
@@ -535,7 +582,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                 } else {
                     sendPositionInfo(location);
                 }
-                positionCount ++;
+                positionCount++;
             }
         });
     }
@@ -543,7 +590,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
     private void stopPosition() {
         GPSUtils.getInstance(getApplicationContext()).removeListener();
     }
-
 
     private void sendPositionInfo(Location location) {
         if (location != null) {

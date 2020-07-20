@@ -13,7 +13,7 @@ import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.util.Log;
 
-import com.eafy.zjlog.ZJLog;
+import com.jimi.jmlog.JMLog;
 
 /**
  * AAC编码器
@@ -59,7 +59,7 @@ public class HWAACEncoder implements Runnable {
 				thread.join();
 				thread = null;
 			} catch (InterruptedException e) {
-				ZJLog.e(TAG, "Stop aac encoder InterruptedException->" + e.getLocalizedMessage());
+				JMLog.e(TAG, "Stop aac encoder InterruptedException->" + e.getLocalizedMessage());
 			}
 		}
 	}
@@ -157,7 +157,7 @@ public class HWAACEncoder implements Runnable {
 							// should happen before receiving buffers, and should only happen once
 							MediaFormat audioOutputFormat = mAudioEncoder.getOutputFormat();
 						} else if (encoderStatus < 0) {
-							ZJLog.e(TAG, "unexpected result from encoder.dequeueOutputBuffer: " + encoderStatus);
+							JMLog.e(TAG, "unexpected result from encoder.dequeueOutputBuffer: " + encoderStatus);
 						} else {
 							ByteBuffer encodedData = outputBuffers[encoderStatus];
 							if (encodedData == null) {

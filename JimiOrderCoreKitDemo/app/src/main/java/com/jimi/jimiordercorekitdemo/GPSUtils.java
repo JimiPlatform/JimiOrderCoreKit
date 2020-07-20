@@ -8,8 +8,6 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
 
-import com.eafy.zjlog.ZJLog;
-
 import java.util.List;
 
 public class GPSUtils {

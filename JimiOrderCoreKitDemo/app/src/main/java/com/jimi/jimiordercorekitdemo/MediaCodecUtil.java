@@ -4,14 +4,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Build;
 
-import com.eafy.zjlog.ZJLog;
-
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserFactory;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
+import com.jimi.jmlog.JMLog;
 
 public class MediaCodecUtil {
 
@@ -52,9 +45,9 @@ public class MediaCodecUtil {
         }
 
         if (isHardcode) {
-            ZJLog.i("Support MediaCodec to decode video data: " + decoderType);
+            JMLog.i("Support MediaCodec to decode video data: " + decoderType);
         } else {
-            ZJLog.e("Not Support MediaCodec to decode video data: " + decoderType);
+            JMLog.e("Not Support MediaCodec to decode video data: " + decoderType);
         }
         return isHardcode;
     }

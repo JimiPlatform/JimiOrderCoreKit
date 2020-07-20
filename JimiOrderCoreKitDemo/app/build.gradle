@@ -36,5 +36,5 @@ dependencies {
     //implementation(name: 'ZJLog', ext:'aar')
     //implementation(name: 'JimiOrderCoreKit_Android_V1.0.2_Release', ext:'aar')
 
-    implementation 'com.jimi.jimitrackorderkit:JimiOrderCoreKit:1.0.9'
+    implementation 'com.jimi.jimitrackorderkit:JimiOrderCoreKit:1.2.9'
 }
