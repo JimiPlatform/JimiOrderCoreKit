@@ -31,6 +31,7 @@
             </intent-filter>
         </activity>
 
+        <service android:name="com.jimi.jimiordercorekit.Server.rtsp.RtspServer"/>
     </application>
 
 </manifest>

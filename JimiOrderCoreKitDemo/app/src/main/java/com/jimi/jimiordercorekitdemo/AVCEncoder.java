@@ -10,7 +10,7 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.util.Log;
 
-import com.jimi.jmlog.JMLog;
+import com.eafy.zjlog.ZJLog;
 
 /**
  * h264编码器
@@ -52,13 +52,13 @@ public class AVCEncoder {
 
 		mSupportColorFormat = getSupportColorFormat();
 		if (mSupportColorFormat < 0) {
-			JMLog.e(TAG, "get support color format failed.");
+			ZJLog.e(TAG, "get support color format failed.");
 			return false;
 		}
 
 		MediaFormat mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
 		if (mediaFormat == null) {
-			JMLog.e(TAG, "create video format failed.");
+			ZJLog.e(TAG, "create video format failed.");
 			return false;
 		}
 		mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, framerate);
@@ -69,7 +69,7 @@ public class AVCEncoder {
 
 		try {
 			mediaCodec = MediaCodec.createEncoderByType("video/avc");
-			JMLog.d("Info framerate:" + framerate + " bitrate:" + bitrate);
+			ZJLog.d("Info framerate:" + framerate + " bitrate:" + bitrate);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -235,7 +235,7 @@ public class AVCEncoder {
 			if (bufferInfo.flags == MediaCodec.BUFFER_FLAG_CODEC_CONFIG) { // sps pps
 				sps_pps = new byte[bufferInfo.size];
 				System.arraycopy(outData, 0, sps_pps, 0, bufferInfo.size);
-				JMLog.printBytes("SPS PPS:",sps_pps);
+				ZJLog.printBytes("SPS PPS:",sps_pps);
 			} else if (sps_pps != null && bufferInfo.size > 0) {
 				if (AVCEncoder.containKeyFrame(outData)) { // key frame
 					byte[] keyframe = new byte[bufferInfo.size + sps_pps.length];

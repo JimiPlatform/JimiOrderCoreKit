@@ -3,7 +3,6 @@ package com.jimi.jimiordercorekitdemo;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.hardware.Camera;
@@ -19,17 +18,16 @@ import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.eafy.zjlog.ZJLog;
 import com.jimi.jimiordercorekit.JMOrderCoreKit;
 import com.jimi.jimiordercorekit.JMOrderPusherListener;
 import com.jimi.jimiordercorekit.JMOrderServerListener;
 import com.jimi.jimiordercorekit.JMOrderTrackerListener;
 import com.jimi.jimiordercorekit.Model.JMTrackAlertInfo;
-import com.jimi.jimiordercorekit.Model.JMTrackGeneralInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackReplyControlCmdInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackHeartbeatInfo;
 import com.jimi.jimiordercorekit.Model.JMTrackPositionInfo;
 import com.jimi.jimiordercorekit.Utils.JMSDKModeEnum;
-import com.jimi.jmlog.JMLog;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -37,8 +35,6 @@ import org.json.JSONException;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.TimeZone;
 
 import static com.jimi.jimiordercorekit.Model.JMTrackAlertInfo.JMAlertType_RearviewCameraShake;
 import static com.jimi.jimiordercorekit.Model.JMTrackHeartbeatInfo.JMGSMSignal_Stronger;
@@ -70,7 +66,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
     private int mAudioChannels = 1;         //音频编码通道数
     private int mAudioBitRate = 128000;     //音频编码比特率
 
-    private String mIMEI = "357730091014168"; //"357730091014168";353376110005078
+    private String mIMEI = "357730091014168"; //"357730091014168";
     private boolean bSupportMulCamera = true;  //是否支持多路摄像头同时播放
     private boolean bFrontCamera = false;   //是否是切换前摄像头（单路有效）
     private boolean bStopPlay = true;
@@ -91,20 +87,22 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             requestPermission();
         }
 
-        JMLog.config.setSaveEnable(true);   //日志保存到内置存储卡
+        ZJLog.config.setSaveEnable(true);   //日志保存到内置存储卡
 
         JMOrderCoreKit.initialize(getApplication());
-        JMOrderCoreKit.configMediaPara(0, mVideoWidth, mVideoHeight, mVideoFrameRate, mVideoBitRate,
+        JMOrderCoreKit.configMediaPara(0, mVideoWidth, mVideoHeight, mVideoFrameRate * 2 /*实际项目中不要*2*/, mVideoBitRate,
                 mAudioSampleRate, mAudioChannels, mAudioBitRate);
-        JMOrderCoreKit.configMediaPara(1, mVideoWidth, mVideoHeight, mVideoFrameRate, mVideoBitRate,
+        JMOrderCoreKit.configMediaPara(1, mVideoWidth, mVideoHeight, mVideoFrameRate * 2 /*实际项目中不要*2*/, mVideoBitRate,
                 mAudioSampleRate, mAudioChannels, mAudioBitRate);
         if (!bSupportMulCamera) {   //如果设备不支持多路同时播放
             JMOrderCoreKit.closeMulCamera();        //关闭多路功能，仅支持单路播放
         }
-        JMOrderCoreKit.configGatewayServer("36.133.0.208", 31100);      //配置网关调试服务器（正式版不需要）
-        JMOrderCoreKit.configLiveServer("", "36.133.0.208");        //配置RTMP调试服务器（正式版不需要）
+//        JMOrderCoreKit.configGatewayServer("36.133.0.208", 31100);      //配置网关调试服务器（正式版不需要）
+//        JMOrderCoreKit.configGatewayServer("8.210.110.221", 21100);      //配置网关调试服务器（正式版不需要）
+//        JMOrderCoreKit.configLiveServer("", "36.133.0.208");        //配置RTMP调试服务器（正式版不需要）
         JMOrderCoreKit.closeSSL();  //关闭视频加密
 
+        //DVR服务
         mJMOrderCoreKit = new JMOrderCoreKit(getApplicationContext(), mIMEI);
         mJMOrderCoreKit.setServerDelegate(mJMOrderServerListener);
         mJMOrderCoreKit.setTrackerDelegate(mJMOrderTrackerListener);
@@ -113,6 +111,10 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
         //DVR和Tracker分离需要调用下面的配置
 //        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.Pusher);        //仅DVR实时视频模式
 //        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.Tracker);     //仅Tracker模式
+
+        //单机模式配置
+//        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.Tracker_StandAlone);    //DVR单机版单，Tracker和Pusher分离，Tracker部分
+        mJMOrderCoreKit.configSDKMode(JMSDKModeEnum.All_StandAlone);    //DVR单机版单APP
 
         mJMOrderCoreKit.connect();
     }
@@ -145,11 +147,14 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             public void run() {
                 if (mJMOrderCoreKit.getSDKMode() != JMSDKModeEnum.Tracker) {    //模拟开始摄像头
                     startBackCamera();
-                    startFrontCamera();
+                    startFrontCamera();     //若设备部支持前摄像头或启动失败需要屏蔽此行
                     startAACEncoder();
 
-//                    mJMOrderCoreKit.initPusher("rtmp://live.jimivideo.com/live/test?secret=admin_xzl_180236");
-//                    mJMOrderCoreKit.initPusher("rtmp://10.0.17.141:1935/lzj/room");
+//                    mJMOrderCoreKit.initPusher("rtmp://live.jimivideo.com/live/test?secret=admin_xzl_180236", false);
+//                    mJMOrderCoreKit.initPusher("rtmp://10.0.17.141:1935/lzj/room", true);
+//                    mJMOrderCoreKit.initPusher("rtmp://113.108.62.203/live/357730090100224?user=jimi&pass=88888888", true);
+//                    mJMOrderCoreKit.initPusher("rtmp://vitrixe.vn/live/357730090100224?user=jimi&pass=88888888", true);
+//                    mJMOrderCoreKit.initPusher("rtmp://live.skysoft.vn/live/357730090100224?user=jimi&pass=88888888", true);
                 }
             }
         };
@@ -224,10 +229,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                         startPosition();
                     }
                 });
-
-                startBackCamera();
-//                startFrontCamera();
-                startAACEncoder();
             }
         }
     };
@@ -236,7 +237,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public void onPusherPlayStatus(int channel, String appId, String url, boolean bPlay) {
-            JMLog.d("onPusherPlayStatus channel:" + channel + " AppId:" + appId + " bPlay:" + bPlay);
+            ZJLog.d("onPusherPlayStatus channel:" + channel + " AppId:" + appId + " bPlay:" + bPlay);
             if (channel == 0) {
                 bIsPlayback1 = false;
             } else if (channel == 1) {
@@ -295,7 +296,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public ArrayList<String> onPusherPlaybackList(int channel, String appId, String url, String fileNameJson) {
-            JMLog.d("onPusherPlaybackList channel:" + channel + " AppId:" + appId + " fileNameJson:" + fileNameJson);
+            ZJLog.d("onPusherPlaybackList channel:" + channel + " AppId:" + appId + " fileNameJson:" + fileNameJson);
 
             //将视频文件拼接成本地的决定路径，不需要检查文件是否存在
             try {
@@ -319,14 +320,14 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             } catch (JSONException e) {
                 e.printStackTrace();
                 bStopPlay = true;
-                JMLog.e("Failed to parse json:" + fileNameJson);
+                ZJLog.e("Failed to parse json:" + fileNameJson);
             }
             return null;
         }
 
         @Override
         public void onPusherPlaybackFileEnd(int channel, String appID, boolean isAllEnd, String fileName) {
-            JMLog.d("onPusherPlaybackFileEnd channel:" + channel + " AppId:" + appID + " isAllEnd:" + isAllEnd + " fileName:" + fileName);
+            ZJLog.d("onPusherPlaybackFileEnd channel:" + channel + " AppId:" + appID + " isAllEnd:" + isAllEnd + " fileName:" + fileName);
             if (isAllEnd) {
                 if (channel == 0) {
                     bIsPlayback1 = false;
@@ -338,12 +339,12 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public void onPusherTalkStatus(String appID, String url, boolean bTalk) {
-            JMLog.d("onPusherTalkStatus AppID:" + appID + " bTalk:" + bTalk);
+            ZJLog.d("onPusherTalkStatus AppID:" + appID + " bTalk:" + bTalk);
         }
 
         @Override
         public void onPusherSwitchCamera(String appID, String url, boolean bFrontCameraT) {
-            JMLog.d("onPusherSwitchCamera AppID:" + appID + " bFrontCamera:" + bFrontCameraT);
+            ZJLog.d("onPusherSwitchCamera AppID:" + appID + " bFrontCamera:" + bFrontCameraT);
             if (!bSupportMulCamera) {
                 bStopPlay = false;
                 bFrontCamera = bFrontCameraT;
@@ -353,7 +354,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public String onPusherRecvCmdData(String appID, int cmdCode, String data, int serverFlag, short serial) {
-            JMLog.d("onPusherRecvCmdData AppID:" + appID + " cmdCode:" + cmdCode + " data:" + data);
+            ZJLog.d("onPusherRecvCmdData AppID:" + appID + " cmdCode:" + cmdCode + " data:" + data);
 
             return "";
         }
@@ -376,7 +377,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
         @Override
         public void onTrackerReplyControl(JMTrackReplyControlCmdInfo info, String cmdContent) {
-            JMLog.d("onTrackerReplyControl cmdContent:" + cmdContent);      //正式版中类似Log的代码可以删掉
+            ZJLog.d("onTrackerReplyControl cmdContent:" + cmdContent);      //正式版中类似Log的代码可以删掉
 
             //处理SDK内部未收录的指令，需要自行解析，之后在info.replyContent中填入相应需要回复的内容
             info.sendOK();
@@ -424,7 +425,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     startBackCamera();
                 }
             } else {
-                JMLog.e("onRequestPermissionsResult: 申请权限已拒绝");
+                ZJLog.e("onRequestPermissionsResult: 申请权限已拒绝");
             }
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -476,7 +477,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     avcEncoder1 = startAvcEncoder();
                 } catch (IOException e) {
                     e.printStackTrace();
-                    JMLog.e(e.getMessage());
+                    ZJLog.e(e.getMessage());
                 }
             }
         }
@@ -503,7 +504,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     avcEncoder2 = startAvcEncoder();
                 } catch (IOException e) {
                     e.printStackTrace();
-                    JMLog.e(e.getMessage());
+                    ZJLog.e(e.getMessage());
                 }
             }
         }
@@ -563,6 +564,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
             @Override
             public void onLocationResult(Location location) {
+                ZJLog.d("1--->Latitude:" + location.getLatitude() + " Longitude:" + location.getLongitude());
                 sendPositionInfo(location);
             }
 
@@ -570,7 +572,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             public void OnLocationChange(Location location) {
                 if (positionCount == 1) {       //模拟告警
                     JMTrackAlertInfo info = new JMTrackAlertInfo();
-                    info.time = getUTCTime();
                     info.latitude = location.getLatitude();
                     info.longitude = location.getLongitude();
                     info.gpsEnable = true;
@@ -580,6 +581,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
                     info.send();    //报警上报
                 } else {
+                    ZJLog.d("2--->Latitude:" + location.getLatitude() + " Longitude:" + location.getLongitude());
                     sendPositionInfo(location);
                 }
                 positionCount++;
@@ -593,8 +595,6 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
     private void sendPositionInfo(Location location) {
         if (location != null) {
-            JMLog.d("--->Latitude:" + location.getLatitude() + " Longitude:" + location.getLongitude());
-            positionInfo.time = getUTCTime();
             positionInfo.latitude = location.getLatitude();
             positionInfo.longitude = location.getLongitude();
             positionInfo.reportMode = JMPositionMode_Timing;
@@ -613,14 +613,5 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
             positionInfo.send();    //定位上报
         }
-    }
-
-    private long getUTCTime() {
-        Calendar cal = Calendar.getInstance();
-        TimeZone tz = TimeZone.getTimeZone("GMT");
-        cal.setTimeZone(tz);
-        long time = cal.getTimeInMillis() / 1000;
-
-        return time;
     }
 }

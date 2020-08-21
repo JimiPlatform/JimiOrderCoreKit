@@ -16,7 +16,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.PermissionChecker;
 
-import com.jimi.jmlog.JMLog;
+import com.eafy.zjlog.ZJLog;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -45,7 +45,7 @@ public class CommonUtils {
             Class.forName("android.support.v4.content.ContextCompat");
             Class.forName("android.support.v4.content.PermissionChecker");
         } catch (ClassNotFoundException e) {
-            JMLog.e("Error: Not exist android.support.v4.content.*");
+            ZJLog.e("Error: Not exist android.support.v4.content.*");
             return false;
         }
         return true;
@@ -144,7 +144,7 @@ public class CommonUtils {
                         }
                     }
 
-                    JMLog.i("Ping server " + "live.jimivideo.com" + " thread exit");
+                    ZJLog.i("Ping server " + "live.jimivideo.com" + " thread exit");
                 }
             });
             mPingLoopThread.start();
@@ -216,10 +216,10 @@ public class CommonUtils {
                                 String splitStr1[] = buffer.toString().split("--- " + mPingHosts + " ping statistics ---");
                                 if (splitStr1.length == 1 || splitStr1[0].contains("icmp_seq=")) {
                                     resultStr = splitStr1[0];
-                                    JMLog.i(resultStr);
+                                    ZJLog.i(resultStr);
                                 } else {
                                     resultStr = splitStr1[0] + splitStr1[1];
-                                    JMLog.i(resultStr);
+                                    ZJLog.i(resultStr);
                                 }
                             }
 
@@ -231,7 +231,7 @@ public class CommonUtils {
                             mPingProcess = null;
 
                             if (bIsRungPing && (resultStr == null || resultStr.isEmpty())) {
-                                JMLog.w("TEST server failed: " + mPingHosts);
+                                ZJLog.w("TEST server failed: " + mPingHosts);
                             }
                         }
                     } catch (IOException e) {
@@ -301,7 +301,7 @@ public class CommonUtils {
 
             return lastKnownLocation;
         } else {
-            JMLog.e("请检查网络或GPS是否打开");
+            ZJLog.e("请检查网络或GPS是否打开");
         }
 
 
