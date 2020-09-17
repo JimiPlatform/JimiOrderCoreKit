@@ -253,6 +253,9 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
             } else {
                 bStopPlay = true;
             }
+
+            // 配置RTSP实时推流地址
+            JMOrderCoreKit.configRTSPLiveServer("Play_RTSP_Push_Url", "Play_RTSP_Push_Server_IP");
         }
 
         @Override
@@ -315,6 +318,10 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     } else if (channel == 1) {
                         bIsPlayback2 = true;
                     }
+
+                    // 配置RTSP回放推流地址
+                    JMOrderCoreKit.configRTSPLiveServer("Playback_RTSP_Push_Url", "Playback_RTSP_Push_Server_IP");
+
                     return list;
                 }
             } catch (JSONException e) {
@@ -381,6 +388,11 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
             //处理SDK内部未收录的指令，需要自行解析，之后在info.replyContent中填入相应需要回复的内容
             info.sendOK();
+        }
+
+        @Override
+        public void onTrackerRecvControlData(byte[] data) {
+            ZJLog.e("onTrackerRecvControlData");
         }
     };
 
@@ -570,7 +582,7 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
 
             @Override
             public void OnLocationChange(Location location) {
-                if (positionCount == 1) {       //模拟告警
+                if (positionCount % 2 == 0) {       //模拟告警
                     JMTrackAlertInfo info = new JMTrackAlertInfo();
                     info.latitude = location.getLatitude();
                     info.longitude = location.getLongitude();
@@ -578,6 +590,8 @@ public class MainActivity extends AppCompatActivity implements PreviewCallback {
                     info.direction = 0;
                     info.alertType = JMAlertType_RearviewCameraShake;
                     info.alertContent = "Hello DVR";    //实际的报警内容，这里是模拟的
+//                    info.alertContent = "Hello DVR".getBytes();
+//                    info.speed = 300;
 
                     info.send();    //报警上报
                 } else {
